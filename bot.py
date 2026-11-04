@@ -1,5 +1,9 @@
 import asyncio
+import http.server
 import logging
+import os
+import socketserver
+import threading
 from html import escape
 
 from aiogram import Bot, Dispatcher, F, types
@@ -18,6 +22,30 @@ from database import (
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
+
+# --- INSTANT PORT BINDING FOR RENDER FREE TIER ---
+def run_web_server():
+    port = int(os.getenv("PORT", 10000))
+    
+    class HealthHandler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"IS Course Bot is active!")
+            
+        def log_message(self, format, *args):
+            pass # Suppress noisy HTTP logs
+
+    try:
+        with socketserver.TCPServer(("0.0.0.0", port), HealthHandler) as httpd:
+            print(f"Web health-check server running on port {port}")
+            httpd.serve_forever()
+    except Exception as e:
+        print(f"Web server error: {e}")
+
+# Start the web server immediately in a background thread
+threading.Thread(target=run_web_server, daemon=True).start()
+# ------------------------------------------------
 
 bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()

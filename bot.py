@@ -123,7 +123,7 @@ def course_keyboard(course_id: int, year: int, semester: int):
 
 def admin_keyboard():
     kb = InlineKeyboardBuilder()
-    kb.button(text="📤 Upload Guide", callback_data="admin_upload_help")
+    kb.button(text="📤 Upload & Command Guide", callback_data="admin_upload_help")
     kb.button(text="📋 List All Materials", callback_data="admin_list_materials")
     kb.button(text="👥 Manage Admins", callback_data="admin_manage_admins")
     kb.button(text="📚 Material Counts", callback_data="admin_stats")
@@ -169,25 +169,27 @@ async def start(message: types.Message):
 async def help_command(message: types.Message):
     admin = is_admin(message.from_user.id if message.from_user else None)
     text = (
-        "<b>How to use this bot</b>\n\n"
-        "1. Tap <b>Exit Exam Materials</b> for national exam preparation.\n"
-        "2. Open <b>Course Materials</b> for regular coursework.\n"
-        "3. Select your academic year, semester, and course.\n\n"
-        "Use <code>/start</code> to reopen the main menu."
+        "📖 <b>How to Interact with IS Course Bot</b>\n\n"
+        "1. <b>Main Menu:</b> Use <code>/start</code> anytime to reopen the main navigation panel.\n"
+        "2. <b>Browsing Course Materials:</b> Tap <b>📚 Course Materials</b> -> Select Year (2, 3, or 4) -> Select Semester -> Choose Course -> Select material category to receive downloadable files instantly.\n"
+        "3. <b>Exit Exam Prep:</b> Tap <b>🎓 Exit Exam Materials</b> for national exam modules, model questions, and preparation guides via <b>About Exit Exam</b>.\n"
+        "4. <b>Academic Guidance:</b> Read <b>🏛️ About Information Systems</b> and the <b>🧭 Student Success Guide</b> for tips on programming, databases, and professional development.\n\n"
     )
     if admin:
-        text += "\n\nAdministrator: send a file with the course code in the caption to upload, and use <code>/delete ID</code> to remove files."
+        text += "🛡️ <b>Administrator Quick Guide:</b>\nSend any document with the course code in the caption, then tap the category button. Use <code>/delete ID</code> to remove materials."
     await message.answer(text, reply_markup=home_keyboard(admin))
 
 
 @dp.callback_query(F.data == "help")
 async def help_callback(callback: types.CallbackQuery):
+    admin = is_admin(callback.from_user.id)
     text = (
-        "<b>How to use this bot</b>\n\n"
-        "Access <b>Exit Exam Materials</b> directly from the home menu, or browse regular <b>Course Materials</b> by year and semester.\n\n"
-        "Use /start to return to the main menu."
+        "📖 <b>How to Interact with IS Course Bot</b>\n\n"
+        "• Access <b>Course Materials</b> by browsing academic year, semester, and course.\n"
+        "• Download <b>Exit Exam Materials</b> for national board exam reviews.\n"
+        "• Use <code>/start</code> anytime to return to the main menu."
     )
-    await show_menu(callback, text, home_keyboard(is_admin(callback.from_user.id)))
+    await show_menu(callback, text, home_keyboard(admin))
     await callback.answer()
 
 
@@ -207,6 +209,11 @@ async def exit_exam_menu(callback: types.CallbackQuery):
     materials = get_exit_materials()
     admin = is_admin(callback.from_user.id if callback.from_user else None)
 
+    kb = InlineKeyboardBuilder()
+    kb.button(text="ℹ️ About Exit Exam & Preparation", callback_data="about_exit_exam")
+    kb.button(text="🏠 Main Menu", callback_data="home")
+    kb.adjust(1)
+
     if not materials:
         text = (
             "🎓 <b>Information Systems Exit Exam Materials</b>\n"
@@ -214,7 +221,7 @@ async def exit_exam_menu(callback: types.CallbackQuery):
             "Comprehensive national exit exam guidelines, review modules, and model questions.\n\n"
             "⚠️ <i>No exit exam materials have been uploaded yet. Please check back soon!</i>"
         )
-        await show_menu(callback, text, back_keyboard("home", "⬅️ Main Menu"))
+        await show_menu(callback, text, kb.as_markup())
         await callback.answer()
         return
 
@@ -223,8 +230,9 @@ async def exit_exam_menu(callback: types.CallbackQuery):
         callback,
         "🎓 <b>Information Systems Exit Exam Materials</b>\n\n"
         "Here are the available exit exam documents:",
-        back_keyboard("home", "⬅️ Main Menu")
+        kb.as_markup()
     )
+    
     for mat_id, title, file_id in materials:
         if admin:
             caption = (
@@ -242,48 +250,67 @@ async def exit_exam_menu(callback: types.CallbackQuery):
         except Exception:
             logger.exception("Could not send exit exam material")
 
+    # Prompt back to start after sending files
+    await callback.message.answer(
+        "📂 All exit exam files delivered successfully.",
+        reply_markup=home_keyboard(admin)
+    )
+
+
+@dp.callback_query(F.data == "about_exit_exam")
+async def about_exit_exam(callback: types.CallbackQuery):
+    admin = is_admin(callback.from_user.id if callback.from_user else None)
+    text = (
+        "ℹ️ <b>Information Systems Exit Exam Guide & Preparation</b>\n"
+        "<i>Ambo University – Woliso Campus</i>\n\n"
+        "<b>What is the National Exit Exam?</b>\n"
+        "The higher education exit exam evaluates core competencies across major IS professional and technical domains.\n\n"
+        "<b>Core Exam Domains to Focus On:</b>\n"
+        "1. <b>Database Management:</b> Normalization (1NF–3NF), SQL, ER modeling, and transaction control.\n"
+        "2. <b>Systems Analysis & Design:</b> UML diagrams, SDLC methodologies, and requirements analysis.\n"
+        "3. <b>Programming & Web Development:</b> Object-oriented principles, algorithms, and full-stack architecture.\n"
+        "4. <b>Networking & Information Security:</b> OSI layers, TCP/IP, cryptography, and access controls.\n"
+        "5. <b>IT Project Management:</b> Agile/Scrum, risk management, and scheduling.\n\n"
+        "<b>Preparation Strategy:</b>\n"
+        "• Download and review all modules and model questions provided in this section.\n"
+        "• Form study groups to discuss scenario-based problems.\n"
+        "• Practice past exams under timed conditions."
+    )
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🎓 Back to Exit Exam Materials", callback_data="exit_exam_menu")
+    kb.button(text="🏠 Main Menu", callback_data="home")
+    kb.adjust(1)
+    await show_menu(callback, text, kb.as_markup())
+    await callback.answer()
+
 
 @dp.callback_query(F.data == "about_is")
 async def about_is(callback: types.CallbackQuery):
+    admin = is_admin(callback.from_user.id if callback.from_user else None)
     text = (
         "🏛️ <b>About Information Systems</b>\n"
         "<i>Ambo University – Woliso Campus</i>\n\n"
         "<b>What is Information Systems?</b>\n"
-        "Information Systems (IS) is a field that connects people, business processes, data, "
+        "Information Systems (IS) connects people, business processes, data, "
         "and technology to help organizations operate effectively and make better decisions.\n\n"
-        "<b>What do IS students learn?</b>\n"
-        "Depending on the curriculum, students study programming, systems analysis and design, "
-        "databases, computer networks, web and mobile development, information security, "
-        "project management, and areas such as artificial intelligence and machine learning.\n\n"
-        "<b>Why does it matter?</b>\n"
-        "Organizations need people who can understand a problem, design an appropriate system, "
-        "manage information responsibly, and communicate with both technical and non-technical users.\n\n"
-        "<b>Possible career directions</b>\n"
-        "Systems analyst, software developer, database specialist, business intelligence analyst, "
-        "IT consultant, and other technology or business-information roles.\n\n"
-        "<b>Advice for second-year students</b>\n"
-        "Build strong programming and database foundations now. Practise every week, ask questions, "
-        "work with classmates, and create small projects you can demonstrate."
+        "<b>Career Directions:</b>\n"
+        "Systems analyst, software developer, database specialist, business intelligence analyst, and IT consultant."
     )
-    await show_menu(callback, text, back_keyboard("home", "⬅️ Main Menu"))
+    await show_menu(callback, text, back_keyboard("home", "🏠 Main Menu"))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "student_guide")
 async def student_guide(callback: types.CallbackQuery):
+    admin = is_admin(callback.from_user.id if callback.from_user else None)
     text = (
         "🧭 <b>Student Success Guide</b>\n\n"
-        "• <b>Practise, don't only read:</b> write code and solve exercises regularly.\n"
-        "• <b>Understand databases:</b> learn tables, keys, relationships, and SQL.\n"
-        "• <b>Build projects:</b> start small, finish them, test them, and document them.\n"
-        "• <b>Use version control:</b> learn Git and keep a professional portfolio.\n"
-        "• <b>Collaborate responsibly:</b> explain your own contribution and help teammates learn.\n"
-        "• <b>Prepare for internships:</b> improve communication, problem-solving, and technical skills.\n"
-        "• <b>Use materials ethically:</b> respect instructors' rules and copyright; do not redistribute "
-        "documents without permission.\n\n"
-        "A good target is one small, completed project at a time."
+        "• <b>Practise code regularly:</b> write programs and solve exercises weekly.\n"
+        "• <b>Master databases:</b> understand tables, primary/foreign keys, and SQL.\n"
+        "• <b>Build real projects:</b> create a portfolio of finished applications.\n"
+        "• <b>Use version control:</b> learn Git and maintain clean code repositories."
     )
-    await show_menu(callback, text, back_keyboard("home", "⬅️ Main Menu"))
+    await show_menu(callback, text, back_keyboard("home", "🏠 Main Menu"))
     await callback.answer()
 
 
@@ -406,6 +433,12 @@ async def select_materials(callback: types.CallbackQuery):
         except Exception:
             logger.exception("Could not send material for course %s", course_id)
 
+    # Prompt back to start after sending files
+    await callback.message.answer(
+        "📂 All requested course materials delivered.",
+        reply_markup=home_keyboard(admin)
+    )
+
 
 @dp.message(Command("delete"))
 async def cmd_delete_material(message: types.Message):
@@ -434,7 +467,7 @@ async def admin_panel(callback: types.CallbackQuery):
         return
     await show_menu(
         callback,
-        "🛡️ <b>Administrator Panel</b>\n\nManage the course-material library and admins.",
+        "🛡️ <b>Administrator Panel</b>\n\nManage the course-material library, administrators, and view commands.",
         admin_keyboard(),
     )
     await callback.answer()
@@ -446,14 +479,17 @@ async def admin_upload_help(callback: types.CallbackQuery):
         await callback.answer("Access denied.", show_alert=True)
         return
     text = (
-        "📤 <b>How to upload & delete materials</b>\n\n"
-        "<b>To Upload:</b>\n"
-        "1. Send any document to this chat.\n"
-        "2. Put **only the course code** in the caption (e.g., <code>InSy2071</code> or <code>EXIT</code>).\n"
-        "3. Tap the category button that appears!\n\n"
-        "<b>To Delete:</b>\n"
-        "Browse to the material as an admin to see its **Material ID**, or check **📋 List All Materials**, then send:\n"
-        "<code>/delete MATERIAL_ID</code>"
+        "📤 <b>Administrator Upload & Command Reference</b>\n\n"
+        "<b>1. How to Upload Materials:</b>\n"
+        "• Send any document (PDF, DOCX, PPTX) to this chat in private.\n"
+        "• Put **only the course code** in the caption (e.g., <code>InSy2071</code> or <code>EXIT</code>).\n"
+        "• Tap the category button that appears to complete the upload.\n\n"
+        "<b>2. Complete Admin Commands List:</b>\n"
+        "• <code>/delete MATERIAL_ID</code> — Removes a specific file from the database.\n"
+        "• <code>/addadmin TELEGRAM_USER_ID</code> — Grants admin rights to another user.\n"
+        "• <code>/removeadmin TELEGRAM_USER_ID</code> — Revokes admin rights from a user.\n"
+        "• <code>/start</code> — Opens the main student interface.\n"
+        "• <code>/help</code> — Displays general bot interaction guides."
     )
     await show_menu(callback, text, back_keyboard("admin_panel", "⬅️ Admin Panel"))
     await callback.answer()

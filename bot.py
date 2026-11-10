@@ -271,7 +271,7 @@ async def about_exit_exam(callback: types.CallbackQuery):
         "📚 <b>2. The Five Examination Themes & Core Courses</b>\n\n"
         "💻 <b>THEME 1: Computer Programming & Web Technology</b>\n"
         "• <i>Courses:</i> Basic Computer Programming I, OOP, Internet Programming, Multimedia IS.\n"
-        "• <i>Focus:</i> Variables, loops, functions, OOP (inheritance, encapsulation, polymorphism), client-server web apps, dynamic web development.\n\n"
+        "• <i>Focus:</i> Variables, loops, functions, OOP (classes, inheritance, encapsulation, polymorphism), client-server web apps, dynamic web development.\n\n"
 
         "🌐 <b>THEME 2: Networking & Information Security</b>\n"
         "• <i>Courses:</i> Data Communication & Computer Networks, Information System Security.\n"
@@ -287,16 +287,29 @@ async def about_exit_exam(callback: types.CallbackQuery):
 
         "⚙️ <b>THEME 5: IS Development & Management</b>\n"
         "• <i>Courses:</i> Systems Analysis & Design, Management of IS & Services, IS Project Management, Enterprise Systems.\n"
-        "• <i>Focus:</i> SDLC, UML modeling, Management Information Systems (MIS), IT governance, WBS, Agile/Scrum, ERP integration.\n\n"
+        "• <i>Focus:</i> SDLC, UML modeling, Management Information Systems (MIS), IT governance, WBS, Agile/Scrum, ERP integration."
+    )
+    kb = InlineKeyboardBuilder()
+    kb.button(text="➡️ Next: Themes 4-5 & Prep Strategy", callback_data="exit_exam_part2")
+    kb.button(text="🎓 Back to Exit Exam Menu", callback_data="exit_exam_menu")
+    kb.button(text="🏠 Main Menu", callback_data="home")
+    kb.adjust(1)
+    await show_menu(callback, text, kb.as_markup())
+    await callback.answer()
 
-        "🎯 <b>3. Preparation Strategy</b>\n"
+
+@dp.callback_query(F.data == "exit_exam_part2")
+async def exit_exam_part2(callback: types.CallbackQuery):
+    text = (
+        "🎯 <b>3. Recommended Preparation Strategy</b>\n"
         "1. <b>Study Systematically:</b> Master all 15 core courses organized by their respective themes.\n"
         "2. <b>Theory + Practical:</b> Do not rely on memorization—practice analyzing code, writing SQL, designing ERD/UML diagrams, and solving scenarios.\n"
         "3. <b>Targeted Revision & Mock Exams:</b> Identify weak themes and test yourself under timed conditions.\n\n"
         "<i>Primary Reference: Ministry of Education, Competency Focus Areas for BSc in Information Systems.</i>"
     )
     kb = InlineKeyboardBuilder()
-    kb.button(text="🎓 Back to Exit Exam Materials", callback_data="exit_exam_menu")
+    kb.button(text="⬅️ Back to Part 1", callback_data="about_exit_exam")
+    kb.button(text="🎓 Back to Exit Exam Menu", callback_data="exit_exam_menu")
     kb.button(text="🏠 Main Menu", callback_data="home")
     kb.adjust(1)
     await show_menu(callback, text, kb.as_markup())

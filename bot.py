@@ -250,7 +250,6 @@ async def exit_exam_menu(callback: types.CallbackQuery):
         except Exception:
             logger.exception("Could not send exit exam material")
 
-    # Prompt back to start after sending files
     await callback.message.answer(
         "📂 All exit exam files delivered successfully.",
         reply_markup=home_keyboard(admin)
@@ -259,22 +258,42 @@ async def exit_exam_menu(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "about_exit_exam")
 async def about_exit_exam(callback: types.CallbackQuery):
-    admin = is_admin(callback.from_user.id if callback.from_user else None)
     text = (
-        "ℹ️ <b>Information Systems Exit Exam Guide & Preparation</b>\n"
-        "<i>Ambo University – Woliso Campus</i>\n\n"
-        "<b>What is the National Exit Exam?</b>\n"
-        "The higher education exit exam evaluates core competencies across major IS professional and technical domains.\n\n"
-        "<b>Core Exam Domains to Focus On:</b>\n"
-        "1. <b>Database Management:</b> Normalization (1NF–3NF), SQL, ER modeling, and transaction control.\n"
-        "2. <b>Systems Analysis & Design:</b> UML diagrams, SDLC methodologies, and requirements analysis.\n"
-        "3. <b>Programming & Web Development:</b> Object-oriented principles, algorithms, and full-stack architecture.\n"
-        "4. <b>Networking & Information Security:</b> OSI layers, TCP/IP, cryptography, and access controls.\n"
-        "5. <b>IT Project Management:</b> Agile/Scrum, risk management, and scheduling.\n\n"
-        "<b>Preparation Strategy:</b>\n"
-        "• Download and review all modules and model questions provided in this section.\n"
-        "• Form study groups to discuss scenario-based problems.\n"
-        "• Practice past exams under timed conditions."
+        "🇪🇹 <b>ETHIOPIAN NATIONAL EXIT EXAMINATION</b>\n"
+        "<b>BSc Information Systems: Competency Framework & Preparation Guide</b>\n"
+        "<i>Ministry of Education Framework (Prepared: August 2022)</i>\n\n"
+        
+        "📌 <b>1. Overview & Framework Purpose</b>\n"
+        "The national Exit Exam assesses IS graduates across core professional competencies. "
+        "Out of 56 courses (256 ECTS) in the 4-year degree program, <b>15 Core Courses (83 ECTS / 49 Credit Hours)</b> "
+        "were selected and grouped into <b>5 Major Themes</b>.\n\n"
+
+        "📚 <b>2. The Five Examination Themes & Core Courses</b>\n\n"
+        "💻 <b>THEME 1: Computer Programming & Web Technology</b>\n"
+        "• <i>Courses:</i> Basic Computer Programming I, OOP, Internet Programming, Multimedia IS.\n"
+        "• <i>Focus:</i> Variables, loops, functions, OOP (inheritance, encapsulation, polymorphism), client-server web apps, dynamic web development.\n\n"
+
+        "🌐 <b>THEME 2: Networking & Information Security</b>\n"
+        "• <i>Courses:</i> Data Communication & Computer Networks, Information System Security.\n"
+        "• <i>Focus:</i> OSI & TCP/IP models, IPv4/IPv6 subnetting, routing, cryptography, authentication, threat detection.\n\n"
+
+        "🗄️ <b>THEME 3: Data & Information Management</b>\n"
+        "• <i>Courses:</i> Database Systems, Information Storage & Retrieval.\n"
+        "• <i>Focus:</i> ER Diagrams, SQL, 1NF–3NF Normalization, ACID transactions, search indexing & retrieval algorithms.\n\n"
+
+        "🤖 <b>THEME 4: Intelligent Systems</b>\n"
+        "• <i>Courses:</i> Fundamentals of AI, Knowledge Management, Intro to Machine Learning.\n"
+        "• <i>Focus:</i> Intelligent agents, search algorithms, expert systems, supervised/unsupervised ML, regression, classification & model evaluation.\n\n"
+
+        "⚙️ <b>THEME 5: IS Development & Management</b>\n"
+        "• <i>Courses:</i> Systems Analysis & Design, Management of IS & Services, IS Project Management, Enterprise Systems.\n"
+        "• <i>Focus:</i> SDLC, UML modeling, Management Information Systems (MIS), IT governance, WBS, Agile/Scrum, ERP integration.\n\n"
+
+        "🎯 <b>3. Preparation Strategy</b>\n"
+        "1. <b>Study Systematically:</b> Master all 15 core courses organized by their respective themes.\n"
+        "2. <b>Theory + Practical:</b> Do not rely on memorization—practice analyzing code, writing SQL, designing ERD/UML diagrams, and solving scenarios.\n"
+        "3. <b>Targeted Revision & Mock Exams:</b> Identify weak themes and test yourself under timed conditions.\n\n"
+        "<i>Primary Reference: Ministry of Education, Competency Focus Areas for BSc in Information Systems.</i>"
     )
     kb = InlineKeyboardBuilder()
     kb.button(text="🎓 Back to Exit Exam Materials", callback_data="exit_exam_menu")
@@ -433,7 +452,6 @@ async def select_materials(callback: types.CallbackQuery):
         except Exception:
             logger.exception("Could not send material for course %s", course_id)
 
-    # Prompt back to start after sending files
     await callback.message.answer(
         "📂 All requested course materials delivered.",
         reply_markup=home_keyboard(admin)

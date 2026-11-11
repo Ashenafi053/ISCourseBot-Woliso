@@ -226,13 +226,8 @@ async def exit_exam_menu(callback: types.CallbackQuery):
         return
 
     await callback.answer(f"Sending {len(materials)} exit exam file(s)…")
-    await show_menu(
-        callback,
-        "🎓 <b>Information Systems Exit Exam Materials</b>\n\n"
-        "Here are the available exit exam documents:",
-        kb.as_markup()
-    )
     
+    # 1. Send materials at the top first
     for mat_id, title, file_id in materials:
         if admin:
             caption = (
@@ -250,10 +245,13 @@ async def exit_exam_menu(callback: types.CallbackQuery):
         except Exception:
             logger.exception("Could not send exit exam material")
 
+    # 2. Send options at the bottom
     await callback.message.answer(
-        "📂 All exit exam files delivered successfully.",
-        reply_markup=home_keyboard(admin)
+        "🎓 <b>Information Systems Exit Exam Materials</b>\n\n"
+        "All exit exam documents have been sent above. Choose an option below:",
+        reply_markup=kb.as_markup()
     )
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "about_exit_exam")
@@ -261,55 +259,41 @@ async def about_exit_exam(callback: types.CallbackQuery):
     text = (
         "🇪🇹 <b>ETHIOPIAN NATIONAL EXIT EXAMINATION</b>\n"
         "<b>BSc Information Systems: Competency Framework & Preparation Guide</b>\n"
-        "<i>Ministry of Education Framework (Prepared: August 2022)</i>\n\n"
+        "<i>Ministry of Education Framework (August 2022)</i>\n\n"
         
-        "📌 <b>1. Overview & Framework Purpose</b>\n"
-        "The national Exit Exam assesses IS graduates across core professional competencies. "
-        "Out of 56 courses (256 ECTS) in the 4-year degree program, <b>15 Core Courses (83 ECTS / 49 Credit Hours)</b> "
+        "📌 <b>1. Overview & Purpose</b>\n"
+        "The Ministry of Education developed a competency-based framework for the national exit exam. "
+        "Out of 56 courses (256 ECTS) in the 4-year curriculum, <b>15 Core Courses (83 ECTS / 49 Credit Hours)</b> "
         "were selected and grouped into <b>5 Major Themes</b>.\n\n"
 
         "📚 <b>2. The Five Examination Themes & Core Courses</b>\n\n"
-        "💻 <b>THEME 1: Computer Programming & Web Technology</b>\n"
-        "• <i>Courses:</i> Basic Computer Programming I, OOP, Internet Programming, Multimedia IS.\n"
-        "• <i>Focus:</i> Variables, loops, functions, OOP (classes, inheritance, encapsulation, polymorphism), client-server web apps, dynamic web development.\n\n"
+        "💻 <b>Theme 1: Computer Programming & Web Technology</b>\n"
+        "• <i>Courses:</i> Basic Programming, OOP, Internet Programming, Multimedia IS.\n"
+        "• <i>Focus:</i> Variables, control structures, OOP principles (inheritance, encapsulation, polymorphism), client-server web apps.\n\n"
 
-        "🌐 <b>THEME 2: Networking & Information Security</b>\n"
-        "• <i>Courses:</i> Data Communication & Computer Networks, Information System Security.\n"
-        "• <i>Focus:</i> OSI & TCP/IP models, IPv4/IPv6 subnetting, routing, cryptography, authentication, threat detection.\n\n"
+        "🌐 <b>Theme 2: Networking & Information Security</b>\n"
+        "• <i>Courses:</i> Data Communication & Networks, IS Security.\n"
+        "• <i>Focus:</i> OSI & TCP/IP models, subnetting, routing, cryptography, authentication, security controls.\n\n"
 
-        "🗄️ <b>THEME 3: Data & Information Management</b>\n"
-        "• <i>Courses:</i> Database Systems, Information Storage & Retrieval.\n"
-        "• <i>Focus:</i> ER Diagrams, SQL, 1NF–3NF Normalization, ACID transactions, search indexing & retrieval algorithms.\n\n"
+        "🗄️ <b>Theme 3: Data & Information Management</b>\n"
+        "• <i>Courses:</i> Database Systems, Info Storage & Retrieval.\n"
+        "• <i>Focus:</i> ER diagrams, SQL queries, 1NF–3NF normalization, ACID transactions, search indexing.\n\n"
 
-        "🤖 <b>THEME 4: Intelligent Systems</b>\n"
+        "🤖 <b>Theme 4: Intelligent Systems</b>\n"
         "• <i>Courses:</i> Fundamentals of AI, Knowledge Management, Intro to Machine Learning.\n"
-        "• <i>Focus:</i> Intelligent agents, search algorithms, expert systems, supervised/unsupervised ML, regression, classification & model evaluation.\n\n"
+        "• <i>Focus:</i> Intelligent agents, search algorithms, expert systems, supervised/unsupervised ML, regression & classification.\n\n"
 
-        "⚙️ <b>THEME 5: IS Development & Management</b>\n"
-        "• <i>Courses:</i> Systems Analysis & Design, Management of IS & Services, IS Project Management, Enterprise Systems.\n"
-        "• <i>Focus:</i> SDLC, UML modeling, Management Information Systems (MIS), IT governance, WBS, Agile/Scrum, ERP integration."
-    )
-    kb = InlineKeyboardBuilder()
-    kb.button(text="➡️ Next: Themes 4-5 & Prep Strategy", callback_data="exit_exam_part2")
-    kb.button(text="🎓 Back to Exit Exam Menu", callback_data="exit_exam_menu")
-    kb.button(text="🏠 Main Menu", callback_data="home")
-    kb.adjust(1)
-    await show_menu(callback, text, kb.as_markup())
-    await callback.answer()
+        "⚙️ <b>Theme 5: IS Development & Management</b>\n"
+        "• <i>Courses:</i> Systems Analysis & Design, MIS Services, IS Project Management, Enterprise Systems.\n"
+        "• <i>Focus:</i> SDLC, UML modeling, IT governance, WBS, Agile/Scrum, ERP integration.\n\n"
 
-
-@dp.callback_query(F.data == "exit_exam_part2")
-async def exit_exam_part2(callback: types.CallbackQuery):
-    text = (
         "🎯 <b>3. Recommended Preparation Strategy</b>\n"
-        "1. <b>Study Systematically:</b> Master all 15 core courses organized by their respective themes.\n"
-        "2. <b>Theory + Practical:</b> Do not rely on memorization—practice analyzing code, writing SQL, designing ERD/UML diagrams, and solving scenarios.\n"
-        "3. <b>Targeted Revision & Mock Exams:</b> Identify weak themes and test yourself under timed conditions.\n\n"
-        "<i>Primary Reference: Ministry of Education, Competency Focus Areas for BSc in Information Systems.</i>"
+        "• Study systematically across all 5 themes and 15 core courses.\n"
+        "• Focus on practical problem-solving, writing code, designing databases, and analyzing scenarios rather than pure memorization.\n"
+        "• Use review modules and practice past exams under timed conditions."
     )
     kb = InlineKeyboardBuilder()
-    kb.button(text="⬅️ Back to Part 1", callback_data="about_exit_exam")
-    kb.button(text="🎓 Back to Exit Exam Menu", callback_data="exit_exam_menu")
+    kb.button(text="🎓 Back to Exit Exam Materials", callback_data="exit_exam_menu")
     kb.button(text="🏠 Main Menu", callback_data="home")
     kb.adjust(1)
     await show_menu(callback, text, kb.as_markup())
@@ -318,15 +302,28 @@ async def exit_exam_part2(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "about_is")
 async def about_is(callback: types.CallbackQuery):
-    admin = is_admin(callback.from_user.id if callback.from_user else None)
     text = (
-        "🏛️ <b>About Information Systems</b>\n"
+        "🏛️ <b>About Information Systems (IS)</b>\n"
         "<i>Ambo University – Woliso Campus</i>\n\n"
         "<b>What is Information Systems?</b>\n"
-        "Information Systems (IS) connects people, business processes, data, "
-        "and technology to help organizations operate effectively and make better decisions.\n\n"
-        "<b>Career Directions:</b>\n"
-        "Systems analyst, software developer, database specialist, business intelligence analyst, and IT consultant."
+        "Information Systems (IS) is a dynamic field bridging people, business processes, data, "
+        "and technology. IS professionals design, implement, and manage technology solutions that help organizations operate efficiently and make strategic decisions.\n\n"
+        
+        "<b>What do IS students learn?</b>\n"
+        "• <b>Programming & Software:</b> Python, Java, PHP, and web development.\n"
+        "• <b>Data & Databases:</b> Relational database design, SQL, and data management.\n"
+        "• <b>Systems Analysis & Design:</b> Requirements gathering, UML modeling, and SDLC.\n"
+        "• <b>Infrastructure & Security:</b> Computer networks, cybersecurity, and operating systems.\n"
+        "• <b>Business & Management:</b> Enterprise systems (ERP), IT project management, and governance.\n\n"
+
+        "<b>Why does Information Systems matter?</b>\n"
+        "Organizations rely on IS specialists who understand both technical architecture and business needs to solve real-world problems and drive digital transformation.\n\n"
+        
+        "<b>Possible Career Directions:</b>\n"
+        "Systems Analyst, Software Developer, Database Administrator, IT Consultant, Business Intelligence Analyst, and Project Manager.\n\n"
+        
+        "💡 <b>Special Advice for 2nd-Year Students:</b>\n"
+        "Welcome to the department! Build strong programming and database foundations right now. Practice coding every week, ask your instructors and peers questions, collaborate on practical lab assignments, and start building small personal projects you can showcase in your portfolio."
     )
     await show_menu(callback, text, back_keyboard("home", "🏠 Main Menu"))
     await callback.answer()
@@ -334,13 +331,30 @@ async def about_is(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "student_guide")
 async def student_guide(callback: types.CallbackQuery):
-    admin = is_admin(callback.from_user.id if callback.from_user else None)
     text = (
-        "🧭 <b>Student Success Guide</b>\n\n"
-        "• <b>Practise code regularly:</b> write programs and solve exercises weekly.\n"
-        "• <b>Master databases:</b> understand tables, primary/foreign keys, and SQL.\n"
-        "• <b>Build real projects:</b> create a portfolio of finished applications.\n"
-        "• <b>Use version control:</b> learn Git and maintain clean code repositories."
+        "🧭 <b>Student Success Guide for IS Undergraduates</b>\n"
+        "<i>Ambo University – Woliso Campus</i>\n\n"
+        
+        "<b>1. Practice, Don't Just Read:</b>\n"
+        "Coding and database design are practical skills. Write code, test queries, and debug errors every week rather than only reading notes before exams.\n\n"
+        
+        "<b>2. Master Relational Databases:</b>\n"
+        "Understand Entity-Relationship (ER) diagrams, primary/foreign keys, complex SQL queries, and normalization (1NF through 3NF). Databases form the backbone of almost all enterprise applications.\n\n"
+        
+        "<b>3. Build Real-World Projects:</b>\n"
+        "Apply what you learn by building small, complete projects (e.g., inventory management systems, e-commerce backends, Telegram bots, or custom web apps). Finish what you start and test your work thoroughly.\n\n"
+        
+        "<b>4. Learn Version Control (Git & GitHub):</b>\n"
+        "Make it a habit to manage your code repositories using Git. A clean GitHub profile demonstrating your coding projects is essential for future internships and careers.\n\n"
+        
+        "<b>5. Master Systems Analysis & Design:</b>\n"
+        "Learn how to listen to user requirements, map out business workflows, and design UML diagrams before jumping straight into coding.\n\n"
+        
+        "<b>6. Collaborate & Communicate Responsibly:</b>\n"
+        "Work effectively in study groups and team projects. Respect academic integrity, share knowledge with classmates, and always understand your own contribution to team assignments.\n\n"
+        
+        "<b>7. Prepare for Industry & Internships:</b>\n"
+        "Work on improving your problem-solving abilities, technical communication, and documentation skills so you are fully prepared for industrial projects and professional life."
     )
     await show_menu(callback, text, back_keyboard("home", "🏠 Main Menu"))
     await callback.answer()

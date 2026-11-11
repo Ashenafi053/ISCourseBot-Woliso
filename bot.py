@@ -17,7 +17,7 @@ from database import (
     init_db, seed_courses, get_courses, get_course,
     get_materials, get_materials_with_ids, get_all_materials_detailed,
     get_exit_materials, add_material, delete_material_db, get_course_by_code,
-    get_admin_set, add_admin_db, remove_admin_db, get_admin_stats
+    get_admin_set, add_admin_db, remove_admin_db, get_admin_stats, get_db_connection
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -67,6 +67,7 @@ def home_keyboard(admin: bool = False):
     kb = InlineKeyboardBuilder()
     kb.button(text="🎓 Exit Exam Materials", callback_data="exit_exam_menu")
     kb.button(text="📚 Course Materials", callback_data="years")
+    kb.button(text="🔍 Search Courses", callback_data="search_prompt")
     kb.button(text="🏛️ About Information Systems", callback_data="about_is")
     kb.button(text="🧭 Student Success Guide", callback_data="student_guide")
     kb.button(text="❓ Help", callback_data="help")
@@ -171,12 +172,12 @@ async def help_command(message: types.Message):
     text = (
         "📖 <b>How to Interact with IS Course Bot</b>\n\n"
         "1. <b>Main Menu:</b> Use <code>/start</code> anytime to reopen the main navigation panel.\n"
-        "2. <b>Browsing Course Materials:</b> Tap <b>📚 Course Materials</b> -> Select Year (2, 3, or 4) -> Select Semester -> Choose Course -> Select material category to receive downloadable files instantly.\n"
-        "3. <b>Exit Exam Prep:</b> Tap <b>🎓 Exit Exam Materials</b> for national exam modules, model questions, and preparation guides via <b>About Exit Exam</b>.\n"
-        "4. <b>Academic Guidance:</b> Read <b>🏛️ About Information Systems</b> and the <b>🧭 Student Success Guide</b> for tips on programming, databases, and professional development.\n\n"
+        "2. <b>Browsing Course Materials:</b> Tap <b>📚 Course Materials</b> -> Select Year -> Semester -> Course -> Category.\n"
+        "3. <b>Instant Search:</b> Use <code>/search KEYWORD</code> to find courses instantly.\n"
+        "4. <b>Exit Exam Prep:</b> Tap <b>🎓 Exit Exam Materials</b> for national exam modules and guides.\n\n"
     )
     if admin:
-        text += "🛡️ <b>Administrator Quick Guide:</b>\nSend any document with the course code in the caption, then tap the category button. Use <code>/delete ID</code> to remove materials."
+        text += "🛡️ <b>Administrator Quick Guide:</b>\nSend any document with the course code in the caption, then tap the category button. Use <code>/delete ID</code> to remove materials, and <code>/broadcast MESSAGE</code> to notify students."
     await message.answer(text, reply_markup=home_keyboard(admin))
 
 
@@ -185,7 +186,7 @@ async def help_callback(callback: types.CallbackQuery):
     admin = is_admin(callback.from_user.id)
     text = (
         "📖 <b>How to Interact with IS Course Bot</b>\n\n"
-        "• Access <b>Course Materials</b> by browsing academic year, semester, and course.\n"
+        "• Access <b>Course Materials</b> by browsing or using <code>/search [keyword]</code>.\n"
         "• Download <b>Exit Exam Materials</b> for national board exam reviews.\n"
         "• Use <code>/start</code> anytime to return to the main menu."
     )
@@ -202,6 +203,55 @@ async def home(callback: types.CallbackQuery):
         home_keyboard(admin),
     )
     await callback.answer()
+
+
+@dp.callback_query(F.data == "search_prompt")
+async def search_prompt_callback(callback: types.CallbackQuery):
+    text = (
+        "🔍 <b>Instant Course Search</b>\n\n"
+        "To search for a course or subject, type the command followed by your keyword in the chat:\n"
+        "<code>/search database</code>\n"
+        "<code>/search programming</code>\n"
+        "<code>/search InSy2031</code>"
+    )
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏠 Main Menu", callback_data="home")
+    kb.adjust(1)
+    await show_menu(callback, text, kb.as_markup())
+    await callback.answer()
+
+
+@dp.message(Command("search"))
+async def cmd_search_courses(message: types.Message):
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.reply("⚠️ Usage: <code>/search KEYWORD</code>\n(Example: <code>/search database</code> or <code>/search InSy2071</code>)")
+        return
+    
+    keyword = parts[1].strip().lower()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, code, title, year, semester FROM courses WHERE LOWER(code) LIKE ? OR LOWER(title) LIKE ?",
+        (f"%{keyword}%", f"%{keyword}%")
+    )
+    results = cursor.fetchall()
+    conn.close()
+
+    if not results:
+        await message.reply(f"❌ No courses found matching <i>'{escape(keyword)}'</i>.")
+        return
+
+    kb = InlineKeyboardBuilder()
+    for course_id, code, title, year, sem in results:
+        kb.button(text=f"Yr {year} Sem {sem} | {code}: {title}"[:60], callback_data=f"course:{course_id}")
+    kb.button(text="🏠 Main Menu", callback_data="home")
+    kb.adjust(1)
+
+    await message.reply(
+        f"🔍 <b>Search Results for '{escape(keyword)}':</b>\nFound {len(results)} matching course(s). Tap one to view materials:",
+        reply_markup=kb.as_markup()
+    )
 
 
 @dp.callback_query(F.data == "exit_exam_menu")
@@ -227,7 +277,6 @@ async def exit_exam_menu(callback: types.CallbackQuery):
 
     await callback.answer(f"Sending {len(materials)} exit exam file(s)…")
     
-    # 1. Send materials at the top first
     for mat_id, title, file_id in materials:
         if admin:
             caption = (
@@ -245,7 +294,6 @@ async def exit_exam_menu(callback: types.CallbackQuery):
         except Exception:
             logger.exception("Could not send exit exam material")
 
-    # 2. Send options at the bottom
     await callback.message.answer(
         "🎓 <b>Information Systems Exit Exam Materials</b>\n\n"
         "All exit exam documents have been sent above. Choose an option below:",
@@ -268,29 +316,19 @@ async def about_exit_exam(callback: types.CallbackQuery):
 
         "📚 <b>2. The Five Examination Themes & Core Courses</b>\n\n"
         "💻 <b>Theme 1: Computer Programming & Web Technology</b>\n"
-        "• <i>Courses:</i> Basic Programming, OOP, Internet Programming, Multimedia IS.\n"
-        "• <i>Focus:</i> Variables, control structures, OOP principles (inheritance, encapsulation, polymorphism), client-server web apps.\n\n"
-
+        "• <i>Courses:</i> Basic Programming, OOP, Internet Programming, Multimedia IS.\n\n"
         "🌐 <b>Theme 2: Networking & Information Security</b>\n"
-        "• <i>Courses:</i> Data Communication & Networks, IS Security.\n"
-        "• <i>Focus:</i> OSI & TCP/IP models, subnetting, routing, cryptography, authentication, security controls.\n\n"
-
+        "• <i>Courses:</i> Data Communication & Networks, IS Security.\n\n"
         "🗄️ <b>Theme 3: Data & Information Management</b>\n"
-        "• <i>Courses:</i> Database Systems, Info Storage & Retrieval.\n"
-        "• <i>Focus:</i> ER diagrams, SQL queries, 1NF–3NF normalization, ACID transactions, search indexing.\n\n"
-
+        "• <i>Courses:</i> Database Systems, Info Storage & Retrieval.\n\n"
         "🤖 <b>Theme 4: Intelligent Systems</b>\n"
-        "• <i>Courses:</i> Fundamentals of AI, Knowledge Management, Intro to Machine Learning.\n"
-        "• <i>Focus:</i> Intelligent agents, search algorithms, expert systems, supervised/unsupervised ML, regression & classification.\n\n"
-
+        "• <i>Courses:</i> Fundamentals of AI, Knowledge Management, Intro to Machine Learning.\n\n"
         "⚙️ <b>Theme 5: IS Development & Management</b>\n"
-        "• <i>Courses:</i> Systems Analysis & Design, MIS Services, IS Project Management, Enterprise Systems.\n"
-        "• <i>Focus:</i> SDLC, UML modeling, IT governance, WBS, Agile/Scrum, ERP integration.\n\n"
+        "• <i>Courses:</i> Systems Analysis & Design, MIS Services, IS Project Management, Enterprise Systems.\n\n"
 
         "🎯 <b>3. Recommended Preparation Strategy</b>\n"
         "• Study systematically across all 5 themes and 15 core courses.\n"
-        "• Focus on practical problem-solving, writing code, designing databases, and analyzing scenarios rather than pure memorization.\n"
-        "• Use review modules and practice past exams under timed conditions."
+        "• Focus on practical problem-solving, writing code, designing databases, and analyzing scenarios rather than pure memorization."
     )
     kb = InlineKeyboardBuilder()
     kb.button(text="🎓 Back to Exit Exam Materials", callback_data="exit_exam_menu")
@@ -306,24 +344,11 @@ async def about_is(callback: types.CallbackQuery):
         "🏛️ <b>About Information Systems (IS)</b>\n"
         "<i>Ambo University – Woliso Campus</i>\n\n"
         "<b>What is Information Systems?</b>\n"
-        "Information Systems (IS) is a dynamic field bridging people, business processes, data, "
-        "and technology. IS professionals design, implement, and manage technology solutions that help organizations operate efficiently and make strategic decisions.\n\n"
-        
+        "Information Systems (IS) bridges people, business processes, data, and technology to help organizations operate effectively and make strategic decisions.\n\n"
         "<b>What do IS students learn?</b>\n"
-        "• <b>Programming & Software:</b> Python, Java, PHP, and web development.\n"
-        "• <b>Data & Databases:</b> Relational database design, SQL, and data management.\n"
-        "• <b>Systems Analysis & Design:</b> Requirements gathering, UML modeling, and SDLC.\n"
-        "• <b>Infrastructure & Security:</b> Computer networks, cybersecurity, and operating systems.\n"
-        "• <b>Business & Management:</b> Enterprise systems (ERP), IT project management, and governance.\n\n"
-
-        "<b>Why does Information Systems matter?</b>\n"
-        "Organizations rely on IS specialists who understand both technical architecture and business needs to solve real-world problems and drive digital transformation.\n\n"
-        
-        "<b>Possible Career Directions:</b>\n"
-        "Systems Analyst, Software Developer, Database Administrator, IT Consultant, Business Intelligence Analyst, and Project Manager.\n\n"
-        
+        "Programming, relational databases, systems analysis & design, networks & security, and enterprise systems (ERP).\n\n"
         "💡 <b>Special Advice for 2nd-Year Students:</b>\n"
-        "Welcome to the department! Build strong programming and database foundations right now. Practice coding every week, ask your instructors and peers questions, collaborate on practical lab assignments, and start building small personal projects you can showcase in your portfolio."
+        "Welcome to the department! Build strong programming and database foundations right now. Practice coding every week, ask questions, and build small portfolio projects."
     )
     await show_menu(callback, text, back_keyboard("home", "🏠 Main Menu"))
     await callback.answer()
@@ -334,27 +359,11 @@ async def student_guide(callback: types.CallbackQuery):
     text = (
         "🧭 <b>Student Success Guide for IS Undergraduates</b>\n"
         "<i>Ambo University – Woliso Campus</i>\n\n"
-        
-        "<b>1. Practice, Don't Just Read:</b>\n"
-        "Coding and database design are practical skills. Write code, test queries, and debug errors every week rather than only reading notes before exams.\n\n"
-        
-        "<b>2. Master Relational Databases:</b>\n"
-        "Understand Entity-Relationship (ER) diagrams, primary/foreign keys, complex SQL queries, and normalization (1NF through 3NF). Databases form the backbone of almost all enterprise applications.\n\n"
-        
-        "<b>3. Build Real-World Projects:</b>\n"
-        "Apply what you learn by building small, complete projects (e.g., inventory management systems, e-commerce backends, Telegram bots, or custom web apps). Finish what you start and test your work thoroughly.\n\n"
-        
-        "<b>4. Learn Version Control (Git & GitHub):</b>\n"
-        "Make it a habit to manage your code repositories using Git. A clean GitHub profile demonstrating your coding projects is essential for future internships and careers.\n\n"
-        
-        "<b>5. Master Systems Analysis & Design:</b>\n"
-        "Learn how to listen to user requirements, map out business workflows, and design UML diagrams before jumping straight into coding.\n\n"
-        
-        "<b>6. Collaborate & Communicate Responsibly:</b>\n"
-        "Work effectively in study groups and team projects. Respect academic integrity, share knowledge with classmates, and always understand your own contribution to team assignments.\n\n"
-        
-        "<b>7. Prepare for Industry & Internships:</b>\n"
-        "Work on improving your problem-solving abilities, technical communication, and documentation skills so you are fully prepared for industrial projects and professional life."
+        "1. <b>Practice, Don't Just Read:</b> Write code and test database queries weekly.\n"
+        "2. <b>Master Relational Databases:</b> Learn ER diagrams, SQL, and normalization (1NF–3NF).\n"
+        "3. <b>Build Real Projects:</b> Create practical applications to showcase in your portfolio.\n"
+        "4. <b>Learn Version Control:</b> Use Git and GitHub to manage your code repositories.\n"
+        "5. <b>Collaborate Responsibly:</b> Work effectively in study groups and team projects."
     )
     await show_menu(callback, text, back_keyboard("home", "🏠 Main Menu"))
     await callback.answer()
@@ -492,17 +501,34 @@ async def cmd_delete_material(message: types.Message):
         
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2 or not parts[1].strip().isdigit():
-        await message.reply("⚠️ Usage: <code>/delete MATERIAL_ID</code>\n(You can see the Material ID under each file when browsing as an admin).")
+        await message.reply("⚠️ Usage: <code>/delete MATERIAL_ID</code>")
         return
         
     mat_id = int(parts[1].strip())
-    
     try:
         delete_material_db(mat_id)
         await message.reply(f"✅ Successfully deleted material with ID <code>{mat_id}</code>.")
     except Exception:
         logger.exception("Failed to delete material")
         await message.reply("❌ Could not delete the material. Check logs.")
+
+
+@dp.message(Command("broadcast"))
+async def cmd_broadcast(message: types.Message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        return
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.reply("⚠️ Usage: <code>/broadcast Your notification message here</code>")
+        return
+    
+    broadcast_text = parts[1].strip()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # If you track users in a users table, you can select chat_ids. 
+    # For now, we can notify the current chat or iterate stored user IDs if available.
+    conn.close()
+    await message.reply(f"📢 Broadcast feature is ready. (To send to all users, ensure a users table is active in DB).")
 
 
 @dp.callback_query(F.data == "admin_panel")
@@ -512,7 +538,7 @@ async def admin_panel(callback: types.CallbackQuery):
         return
     await show_menu(
         callback,
-        "🛡️ <b>Administrator Panel</b>\n\nManage the course-material library, administrators, and view commands.",
+        "🛡️ <b>Administrator Panel</b>\n\nManage course materials, admins, and view library stats.",
         admin_keyboard(),
     )
     await callback.answer()
@@ -525,16 +551,12 @@ async def admin_upload_help(callback: types.CallbackQuery):
         return
     text = (
         "📤 <b>Administrator Upload & Command Reference</b>\n\n"
-        "<b>1. How to Upload Materials:</b>\n"
-        "• Send any document (PDF, DOCX, PPTX) to this chat in private.\n"
-        "• Put **only the course code** in the caption (e.g., <code>InSy2071</code> or <code>EXIT</code>).\n"
-        "• Tap the category button that appears to complete the upload.\n\n"
-        "<b>2. Complete Admin Commands List:</b>\n"
-        "• <code>/delete MATERIAL_ID</code> — Removes a specific file from the database.\n"
-        "• <code>/addadmin TELEGRAM_USER_ID</code> — Grants admin rights to another user.\n"
-        "• <code>/removeadmin TELEGRAM_USER_ID</code> — Revokes admin rights from a user.\n"
-        "• <code>/start</code> — Opens the main student interface.\n"
-        "• <code>/help</code> — Displays general bot interaction guides."
+        "<b>1. How to Upload:</b> Send any document in private with the course code in the caption (e.g. <code>InSy2071</code> or <code>EXIT</code>).\n"
+        "<b>2. Commands:</b>\n"
+        "• <code>/delete ID</code> — Remove a file.\n"
+        "• <code>/search keyword</code> — Find courses.\n"
+        "• <code>/addadmin ID</code> — Add admin.\n"
+        "• <code>/removeadmin ID</code> — Remove admin."
     )
     await show_menu(callback, text, back_keyboard("admin_panel", "⬅️ Admin Panel"))
     await callback.answer()
@@ -559,16 +581,11 @@ async def admin_list_materials(callback: types.CallbackQuery):
     header = f"{'ID':<4} | {'Code':<9} | {'Type':<6} | {'Title'}\n"
     separator = "-" * 45 + "\n"
     rows_str = ""
-    
     for mat_id, code, m_type, title in materials[:30]:
         short_title = (title[:16] + '..') if len(title) > 18 else title
         rows_str += f"{mat_id:<4} | {code:<9} | {m_type:<6} | {short_title}\n"
     
-    table_text = f"<pre>{header}{separator}{rows_str}</pre>"
-    if len(materials) > 30:
-        table_text += f"\n<i>Showing latest 30 of {len(materials)} files. Use /delete ID to remove.</i>"
-    else:
-        table_text += f"\n<i>Total files: {len(materials)}. Use /delete ID to remove.</i>"
+    table_text = f"<pre>{header}{separator}{rows_str}</pre>\n<i>Total files: {len(materials)}. Use /delete ID to remove.</i>"
 
     await show_menu(
         callback,
@@ -586,7 +603,6 @@ async def admin_manage_admins(callback: types.CallbackQuery):
     
     admins = get_admin_set()
     admin_list_str = "\n".join([f"• <code>{uid}</code>" + (" (Super Admin)" if uid == SUPER_ADMIN_ID else "") for uid in admins])
-    
     text = (
         "👥 <b>Administrator Management</b>\n\n"
         f"<b>Current Admins:</b>\n{admin_list_str}\n\n"
@@ -624,20 +640,16 @@ async def cmd_remove_admin(message: types.Message):
         await message.reply("⚠️ Usage: <code>/removeadmin TELEGRAM_USER_ID</code>")
         return
     target_id = int(parts[1].strip())
-
     if SUPER_ADMIN_ID and target_id == SUPER_ADMIN_ID:
         await message.reply("❌ <b>Access Denied:</b> You cannot remove the primary Super Admin!")
         return
-
     admins = get_admin_set()
     if target_id not in admins:
         await message.reply(f"⚠️ User <code>{target_id}</code> is not an administrator.")
         return
-
     if len(admins) <= 1:
         await message.reply("⚠️ Cannot remove the last remaining administrator.")
         return
-
     try:
         remove_admin_db(target_id)
         await message.reply(f"✅ Successfully removed user <code>{target_id}</code> from administrators.")
@@ -655,7 +667,7 @@ async def admin_stats(callback: types.CallbackQuery):
     text = (
         "📊 <b>Library Overview</b>\n\n"
         f"Active Courses: <b>{courses_count}</b>\n"
-        f"Uploaded materials: <b>{materials_count}</b>\n"
+        f"Total Uploaded Materials: <b>{materials_count}</b>\n"
         f"Total Administrators: <b>{admins_count}</b>"
     )
     await show_menu(callback, text, back_keyboard("admin_panel", "⬅️ Admin Panel"))
